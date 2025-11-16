@@ -24,7 +24,7 @@ goedeaudiofiles = filter( x -> JSON.parsefile("data/downloads/" * split(x, ".")[
 
 file = goedeaudiofiles[1]
 
-
+"sdfsdlfjsdlfkj"
 function readwav(file :: String) 
     filepath, fileio = mktemp()
     run(`$(ffmpeg()) -i $file -f wav $(filepath) -y`)
@@ -41,19 +41,64 @@ end
 
 x = readwav("data/downloads/XC1004643.mpeg")
 
-x[1:1000, :]
 
-wavplay(x[1:100000, :], samplerate)
+y = x[1:(10*samplerate),1]
 
-
-y = x[:,1]
+wavplay(y, samplerate)
 
 
-W = 64
-w = ones(W)
-H = 10
+
+
+win = win_len -> sin.(π * (1:win_len)/(win_len+1)).^2
+winnorm = win_len -> begin
+        win1 = win(win_len)
+        norm = win1.^2
+        for i = 1+hop:hop:win_len
+            norm[1:end-i+1] += win1[i:end].^2
+            norm[i:end] += win1[1:end-i+1].^2
+        end
+
+        win_hat = win1 ./ sqrt.(real(norm))  
+        return win_hat
+    end
+
+
+
+
+win_len = 50
+win = sin.(π * (1:win_len)/(win_len+1)).^2;
+hop = 15
+plot(1:win_len, win)
+
+
+
+W = 4800
+#w = ones(W)
+H = 600
 L = W - H
 
-Y = stft(y, w, L)
-s = abs2.(Y)
-heatmap(s)
+Y = stft(y, winnorm(W), L)
+s = log10.(abs2.(Y)) 
+s = s .- maximum(s)
+s = clamp.(s, -5,0)
+heatmap(s, color=cgrad(:grays, rev=true))
+
+Y2 = 10 .^ Y
+
+y2 = istft(Y, winnorm(W), L)
+
+plot([y[1:1000] y2[1:1000]])
+
+wavplay(y, samplerate)
+wavplay(y2, samplerate)
+
+
+4test = ones(50+29*15)
+Test = stft(test, winnorm(50), 50-15)
+
+
+heatmap(abs2.(Test) .|> log10)
+testr = istft(Test, winnorm(50), 50-15)
+plot((testr))
+
+maximum(abs.(testr))
