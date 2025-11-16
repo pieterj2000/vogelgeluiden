@@ -2,10 +2,13 @@
 using Plots
 using FFTW
 
+include("stft.jl")
+
 win_len = 50
-win = sin.(π * (1:win_len)/(win_len+1)).^2;
+win = STFT.hann_window(win_len)
 hop = 15
 
+win == sin.(π * (1:win_len)/(win_len+1)).^2
 plot(win)
 
 norm = win.^2
@@ -15,13 +18,13 @@ for i = 1+hop:hop:win_len
 end
 
 win_hat = win ./ sqrt.(real(norm))
-win = win_hat
+#win = win_hat
 plot(win)
      
 
 K = 30
 signal_len = win_len + (K-1) * hop
-x = randn(signal_len);
+x = randn(signal_len)
 plot(x)
 
 
@@ -56,9 +59,13 @@ M3 = Z -> fft(Z,[1])/√(win_len)
 # we declare a new map by cascading these operations.
 M = z -> M3( M2( M1(z) ) )
      
-Y = M(x);
+Y = M(x)
+Z = STFT.stft(Complex.(x), Complex.(win), hop)
+#Z = STFT.rstft(x, win, hop)
 error = sum(abs.(Y[:] - X[:]).^2)
+error = sum(abs.(Z[:] - X[:]).^2)
 println("Error : ", error)
+sum(abs2.(Y-Z))
 
 M3T = Z -> ifft(Z,[1]) * √(win_len)
 
@@ -102,11 +109,95 @@ MT = Z -> M1T( M2T( M3T(Z) ) )
 MTM = z -> MT( M(z) )
 
 
-x2 = MTM(x) .|> real
-plot([x, x2])
-plot((x-x2)[100:400])
 
-ax.legend()
+
+z = randn(signal_len)+ randn(signal_len)im
+Z = randn(win_len,K) + randn(win_len,K)im
+in1 = inner_product( STFT.maaksegments(z, win_len, hop), Z )
+in2 = inner_product( z, STFT.overlapadd(Z, hop) )
+in2 = inner_product( z, M1T(Z) )
+println("*** Testing transpose for M1 ***")
+println("Difference between the two inner products: ", in1 - in2)
+
+
+
+Z2 = randn(win_len,K) + randn(win_len,K)im
+in1 = inner_product( STFT.applyWindow(Z, win), Z2 )
+in2 = inner_product( Z, STFT.applyWindow(Z2, win) )
+println("*** Testing transpose for M2 ***")
+println("Difference between the two inner products: ", in1 - in2)
+
+
+in1 = inner_product( M3(Z), Z2 )
+in2 = inner_product( Z, M3T(Z2) )
+println("*** Testing transpose for M3 ***")
+println("Difference between the two inner products: ", in1 - in2)
+
+
+MT = Z -> M1T( M2T( M3T(Z) ) )
+
+MTM = z -> MT( M(z) )
+
+zhun = MT(Y)
+zons = STFT.istft(Y, win, hop)
+zhun-zons
+sum(abs2.(zhun-zons))
+
+MTMons = z -> STFT.istft(STFT.stft(Complex.(z), win, hop) , win, hop)
+
+x2 = MTM(x) #.|> real
+interm = STFT.stft(Complex.(x), win, hop)
+x2ons = STFT.istft(interm , win, hop)
+x2ons = MTMons(x)
+
+abs2.(x2 - x2ons) |> sum
+
+x2 = real.(x2)
+x2ons = real.(x2ons)
+
+plot([x, x2])
+
+MTM(ones(signal_len))
+MTMons(ones(signal_len))
+
+
      
 P = MTM(ones(signal_len)) .|> real
 plot(P)
+
+
+plot([P.*x, real.(P.*x - MTM(x))])
+plot(real.(P.*x - MTM(x)))
+
+
+
+# initialize the normalization window
+norm = win.^2
+for i = 1+hop:hop:win_len
+    norm[1:end-i+1] += win[i:end].^2
+    norm[i:end] += win[1:end-i+1].^2
+end
+
+win_hat = win ./ sqrt.(real(norm))
+
+plot(win, label = "original window function")
+plot!(win_hat, label = "modified window function")
+
+win_hatons = STFT.normalize_window(win)
+     
+# modify M2
+M̂2 = Z -> Map2(Z, win_hat)
+M̂2T = M̂2
+
+# modify M
+M̂ = z -> M3(M̂2(M1(z)))
+M̂T = Z -> M1T(M̂2T(M3T(Z)))
+
+N = win_len - hop
+P̂ = M̂T(M̂(ones(signal_len)))
+dif = M̂T(M̂(x)) - x
+
+plot(x, label = "input signal")
+plot!(real.(P̂), label = "P̂")
+plot!(real(dif), label = "real part of the reconstruction error")
+plot!(imag(dif), label = "imaginary part of the reconstruction error")

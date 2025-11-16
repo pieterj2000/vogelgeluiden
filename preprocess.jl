@@ -4,7 +4,12 @@ using FFMPEG_jll
 using WAV
 
 using Plots
-using STFT
+
+
+include("stft.jl")
+
+
+
 
 files = readdir("data/downloads/")
 audiofiles = filter(x -> in('.', x), files)
@@ -48,44 +53,23 @@ wavplay(y, samplerate)
 
 
 
-
-win = win_len -> sin.(π * (1:win_len)/(win_len+1)).^2
-winnorm = win_len -> begin
-        win1 = win(win_len)
-        norm = win1.^2
-        for i = 1+hop:hop:win_len
-            norm[1:end-i+1] += win1[i:end].^2
-            norm[i:end] += win1[1:end-i+1].^2
-        end
-
-        win_hat = win1 ./ sqrt.(real(norm))  
-        return win_hat
-    end
-
-
-
-
-win_len = 50
-win = sin.(π * (1:win_len)/(win_len+1)).^2;
-hop = 15
-plot(1:win_len, win)
-
-
-
 W = 4800
 #w = ones(W)
 H = 600
 L = W - H
 
-Y = stft(y, winnorm(W), L)
-s = log10.(abs2.(Y)) 
+
+Z = stft(y, win(W), H) .* sqrt(W)
+
+s = abs2.(Z)
+s = log10.(s)
 s = s .- maximum(s)
 s = clamp.(s, -5,0)
 heatmap(s, color=cgrad(:grays, rev=true))
 
 Y2 = 10 .^ Y
 
-y2 = istft(Y, winnorm(W), L)
+y2 = STFTgoed.istft(Y, win(W), L)
 
 plot([y[1:1000] y2[1:1000]])
 
