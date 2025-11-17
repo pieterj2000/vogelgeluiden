@@ -162,6 +162,15 @@ MTM(ones(signal_len))
 MTMons(ones(signal_len))
 
 
+plot(win)
+plot!(win_hatons)
+z = randn(signal_len)+ randn(signal_len)im
+Z = randn(win_len,K) + randn(win_len,K)im
+in1 = inner_product( STFT.stft(z, win, hop), Z )
+in2 = inner_product( z, STFT.istft(Z , win, hop) )
+println("*** Testing transpose for M3 ***")
+println("Difference between the two inner products: ", in1 - in2)
+
      
 P = MTM(ones(signal_len)) .|> real
 plot(P[10:end-10])
@@ -211,14 +220,26 @@ plot!(real.(P̂), label = "P̂")
 plot!(real(dif), label = "real part of the reconstruction error")
 plot!(imag(dif), label = "imaginary part of the reconstruction error")
 
+plot(win)
+plot!(win_hatons)
 
 win2 = win_hatons
 P̂ = STFT.istft(STFT.stft(ones(Complex, signal_len), win2, hop) , win2, hop)
-dif = STFT.istft(STFT.stft(Complex.(x), win, hop) , win, hop) - x
-x2 = STFT.istft(STFT.stft(Complex.(x), win, hop) , win, hop)
+dif = STFT.istft(STFT.stft(Complex.(x), win2, hop) , win2, hop) - x
+x2 = STFT.istft(STFT.stft(Complex.(x), win2, hop) , win2, hop)
 plot(x, label = "input signal")
 plot!(real.(P̂), label = "P̂")
 plot!(real(dif), label = "real part of the reconstruction error")
 plot!(imag(dif), label = "imaginary part of the reconstruction error")
 plot!(x2 .|> real)
 abs2.(x - x2) |> sum
+
+
+
+
+
+
+plot((hann_window(100)))
+plot!(normalize_window((hann_window(100)),50))
+
+sum(normalize_window(hann_window(50), 15))

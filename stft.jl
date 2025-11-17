@@ -42,10 +42,9 @@ end
 
 "calculates unitary stft, for complex vectors calculates twosided, for real vectors calculates onesided (resulting in n/2 + 1 frequency bins)"
 function stft(x :: Vector{<:Number}, w :: Vector{<:Number}, hop :: Int) :: Array{<:Complex, 2}
-    window = normalize_window(w, hop)
     window_length = length(w)
     segs = maaksegments(x, window_length, hop)
-    segsw = applyWindow( segs, window )
+    segsw = applyWindow( segs, w )
     return _fft(segsw, 1) ./ sqrt(length(w))
 end
 
@@ -56,36 +55,37 @@ end
 
 
 function overlapadd(X :: Array{T, 2}, win, hop :: Int; lse = false) :: Vector{T} where T <: Number
-    #X = X ./ win
+    X = X .* win
 
     num_segments = size(X)[2]
     window_length = size(X)[1]
     signal_length = hop * (num_segments - 1) + window_length
     x = zeros(T, signal_length) :: Vector{T}
-    d = zeros(T, signal_length) :: Vector{T}
+    #d = zeros(T, signal_length) :: Vector{T}
     for j = 1:num_segments
         startindex = (j-1)*hop+1
         eindindex = startindex + window_length - 1
         x[startindex:eindindex] += X[:, j]# .* win
-        d[startindex:eindindex] += win # .^2
+        #d[startindex:eindindex] += win # .^2
     end
-    return x ./ d
+    return x# ./ d
 end
 
 
 function istftcommon(X :: Array{<:Number, 2}, w :: Vector{<:Number}, hop :: Int) # :: Vector{<:Number}
-    window = normalize_window(w, hop)
     #segsw = applyWindow(X, window)
-    return overlapadd(X, window, hop)
+    return overlapadd(X, w, hop)
 end
 
-"calculates unitary inverse stft resulting in complex (time-domain) function"
+"calculates unitary inverse stft resulting in complex (time-domain) function.
+ NB: requires a normalized window for perfect reconstruction"
 function istft(X :: Array{<:Number, 2}, w :: Vector{<:Number}, hop :: Int) :: Vector{<:Complex}
     segs = ifft(X, 1) .* sqrt(length(w))
     return istftcommon(segs, w, hop)
 end
 
-"calculates unitary inverse stft resulting in real (time-domain) function"
+"calculates unitary inverse stft resulting in real (time-domain) function.
+ NB: requires a normalized window for perfect reconstruction"
 function irstft(X :: Array{<:Number, 2}, w :: Vector{<:Number}, hop :: Int) :: Vector{<:Real}
     window_length = length(w)
     segs = irfft(X, window_length, 1) .* sqrt(length(w))
@@ -102,7 +102,7 @@ but the stft may have been modified and there may not exist a signal that result
 modified stft
 """
 function imstft()
-    error("unimplemented")
+    error("unimplemented: just use regular istft with a normalized window, is same")
 end
 
 
@@ -113,7 +113,7 @@ but the stft may have been modified and there may not exist a signal that result
 modified stft
 """
 function irmstft()
-    error("unimplemented")
+    error("unimplemented: just use regular irstft with a normalized window, is same")
 end
 
 
@@ -144,7 +144,9 @@ end
 
 
 
-"normalize window such that the stft is perfectly representable"
+"normalize window such that the stft is perfectly representable,
+scales window such that \sum_k w^2(k*S-n) = 1
+"
 function normalize_window(w, hop)
     win_len = length(w)
     w2 = abs2.(w)
