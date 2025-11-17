@@ -151,11 +151,12 @@ x2ons = STFT.istft(interm , win, hop)
 x2ons = MTMons(x)
 
 abs2.(x2 - x2ons) |> sum
+abs2.(x - x2ons) |> sum
 
 x2 = real.(x2)
 x2ons = real.(x2ons)
 
-plot([x, x2])
+plot([x, x2ons])
 
 MTM(ones(signal_len))
 MTMons(ones(signal_len))
@@ -163,7 +164,9 @@ MTMons(ones(signal_len))
 
      
 P = MTM(ones(signal_len)) .|> real
-plot(P)
+plot(P[10:end-10])
+P2 = MTMons(ones(signal_len)) .|> real
+plot!(P2[10:end-10])
 
 
 plot([P.*x, real.(P.*x - MTM(x))])
@@ -183,7 +186,13 @@ win_hat = win ./ sqrt.(real(norm))
 plot(win, label = "original window function")
 plot!(win_hat, label = "modified window function")
 
-win_hatons = STFT.normalize_window(win)
+win_hatons = STFT.normalize_window(win, hop)
+win_hatons2 = STFT.normalize_window(win_hatons, hop)
+plot!(win_hatons)
+plot!(win_hatons2)
+(win_hat - win_hatons ).|> abs2 |> sum
+(win_hatons2 - win_hatons ).|> abs2 |> sum
+
      
 # modify M2
 M̂2 = Z -> Map2(Z, win_hat)
@@ -201,3 +210,15 @@ plot(x, label = "input signal")
 plot!(real.(P̂), label = "P̂")
 plot!(real(dif), label = "real part of the reconstruction error")
 plot!(imag(dif), label = "imaginary part of the reconstruction error")
+
+
+win2 = win_hatons
+P̂ = STFT.istft(STFT.stft(ones(Complex, signal_len), win2, hop) , win2, hop)
+dif = STFT.istft(STFT.stft(Complex.(x), win, hop) , win, hop) - x
+x2 = STFT.istft(STFT.stft(Complex.(x), win, hop) , win, hop)
+plot(x, label = "input signal")
+plot!(real.(P̂), label = "P̂")
+plot!(real(dif), label = "real part of the reconstruction error")
+plot!(imag(dif), label = "imaginary part of the reconstruction error")
+plot!(x2 .|> real)
+abs2.(x - x2) |> sum

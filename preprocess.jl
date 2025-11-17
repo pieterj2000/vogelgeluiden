@@ -7,8 +7,7 @@ using Plots
 
 
 include("stft.jl")
-
-
+using .STFT
 
 
 files = readdir("data/downloads/")
@@ -58,10 +57,15 @@ W = 4800
 H = 600
 L = W - H
 
+win = hann_window(W)
+#win = normalize_window(win, H)
+plot(hann_window(W))
+plot!(win)
 
-Z = stft(y, win(W), H) .* sqrt(W)
+Y = rstft(y, win, H)
+Y = rstft(x[:,1], win, H)
 
-s = abs2.(Z)
+s = abs2.(Y)
 s = log10.(s)
 s = s .- maximum(s)
 s = clamp.(s, -5,0)
@@ -69,12 +73,17 @@ heatmap(s, color=cgrad(:grays, rev=true))
 
 Y2 = 10 .^ Y
 
-y2 = STFTgoed.istft(Y, win(W), L)
+y2 = irstft(Y, win, H)
 
-plot([y[1:1000] y2[1:1000]])
+abs2.(x[1:1720200, 1] - y2) |> sum
+abs2.(x[4800:1720200-4800, 1] - y2[4800:1720200-4800]) |> sum
+
+plot([x[1:10000, 1] y2[1:10000]])
+
+#plot(x[:,1])
 
 wavplay(y, samplerate)
-wavplay(y2, samplerate)
+wavplay(y2[1:480000], samplerate)
 
 
 4test = ones(50+29*15)

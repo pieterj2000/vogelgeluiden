@@ -15,6 +15,10 @@ export stft, rstft, istft, irstft, imstft, irmstft, imstftm, irmstftm, normalize
 # zie ook de grifin-lim paper
 # Signal Estimation from Modified Short-Time Fourier Transform DANIEL W . GRIFFIN A N D J A E S. LIM, SENIOR MEMBER, IEE
 
+# zie ook:
+# https://www.audiolabs-erlangen.de/resources/MIR/FMP/C2/C2_STFT-Inverse.html
+# https://www.audiolabs-erlangen.de/resources/MIR/FMP/C8/C8S1_SignalReconstruction.html
+
 
 _fft(x::AbstractMatrix{<:Real}, d) = rfft(x, d)
 _fft(x::AbstractMatrix{<:Complex}, d) = fft(x, d)
@@ -38,35 +42,41 @@ end
 
 "calculates unitary stft, for complex vectors calculates twosided, for real vectors calculates onesided (resulting in n/2 + 1 frequency bins)"
 function stft(x :: Vector{<:Number}, w :: Vector{<:Number}, hop :: Int) :: Array{<:Complex, 2}
+    window = normalize_window(w, hop)
     window_length = length(w)
     segs = maaksegments(x, window_length, hop)
-    segsw = applyWindow( segs, w )
+    segsw = applyWindow( segs, window )
     return _fft(segsw, 1) ./ sqrt(length(w))
 end
 
 "calculates unitary stft for real vector, so onesided (resulting in n/2 + 1 frequency bins)"
-function rstft(x :: Vector{Real}, w :: Vector{<:Number}, hop :: Int) :: Array{<:Complex, 2}
+function rstft(x :: Vector{<:Real}, w :: Vector{<:Number}, hop :: Int) :: Array{<:Complex, 2}
     stft(x, w, hop)
 end
 
 
-function overlapadd(X :: Array{T, 2}, hop :: Int) :: Vector{T} where T <: Number
+function overlapadd(X :: Array{T, 2}, win, hop :: Int; lse = false) :: Vector{T} where T <: Number
+    #X = X ./ win
+
     num_segments = size(X)[2]
     window_length = size(X)[1]
     signal_length = hop * (num_segments - 1) + window_length
     x = zeros(T, signal_length) :: Vector{T}
+    d = zeros(T, signal_length) :: Vector{T}
     for j = 1:num_segments
         startindex = (j-1)*hop+1
         eindindex = startindex + window_length - 1
-        x[startindex:eindindex] += X[:, j]
+        x[startindex:eindindex] += X[:, j]# .* win
+        d[startindex:eindindex] += win # .^2
     end
-    return x
+    return x ./ d
 end
 
 
 function istftcommon(X :: Array{<:Number, 2}, w :: Vector{<:Number}, hop :: Int) # :: Vector{<:Number}
-    segsw = applyWindow(X, w)
-    return overlapadd(segsw, hop)
+    window = normalize_window(w, hop)
+    #segsw = applyWindow(X, window)
+    return overlapadd(X, window, hop)
 end
 
 "calculates unitary inverse stft resulting in complex (time-domain) function"
@@ -76,8 +86,10 @@ function istft(X :: Array{<:Number, 2}, w :: Vector{<:Number}, hop :: Int) :: Ve
 end
 
 "calculates unitary inverse stft resulting in real (time-domain) function"
-function irstft()
-    error("unimplemented")
+function irstft(X :: Array{<:Number, 2}, w :: Vector{<:Number}, hop :: Int) :: Vector{<:Real}
+    window_length = length(w)
+    segs = irfft(X, window_length, 1) .* sqrt(length(w))
+    return istftcommon(segs, w, hop)
 end
 
 
@@ -133,8 +145,15 @@ end
 
 
 "normalize window such that the stft is perfectly representable"
-function normalize_window()
-    error("unimplemented")
+function normalize_window(w, hop)
+    win_len = length(w)
+    w2 = abs2.(w)
+    P = copy(w2)
+    for i = 1 + hop : hop : win_len
+        P[i:end] += w2[1:end-i+1] # voor windows die naar rechts geschoven zijn
+        P[1:end-i+1] += w2[i:end] # voor windows die naar links geschoven zijn
+    end
+    return w ./ sqrt.(P)
 end
 
 
