@@ -44,9 +44,10 @@ end
 # x = load("data/downloads/XC1052236.mp3")
 
 x = readwav("data/downloads/XC1004643.mpeg")
+x = readwav("piano2.wav")
 
 
-y = x[1:(10*samplerate),1]
+y = x[1:(3*samplerate),1]
 
 wavplay(y, samplerate)
 
@@ -58,12 +59,12 @@ H = 600
 L = W - H
 
 win = hann_window(W)
-#win = normalize_window(win, H)
+win = normalize_window(win, H)
 plot(hann_window(W))
 plot!(win)
 
 Y = rstft(y, win, H)
-Y = rstft(x[:,1], win, H)
+#Y = rstft(x[:,1], win, H)
 
 s = abs2.(Y)
 s = log10.(s)
@@ -79,6 +80,31 @@ abs2.(x[1:1720200, 1] - y2) |> sum
 abs2.(x[4800:1720200-4800, 1] - y2[4800:1720200-4800]) |> sum
 
 plot([x[1:10000, 1] y2[1:10000]])
+x[1:10000, 1] - y2[1:10000] .|> abs2 |> sum
+
+
+M = abs.(Y)
+heatmap(M .|> log10, color=cgrad(:grays, rev=true))
+m = irmstftm(M, win, H)
+
+M2 = Complex.(M)
+M2 = cis.(angle.(Y)) .* M
+M2 = cispi.(rand(Float64, size(M))) .* M
+mslecht = irstft(M2, win, H)
+plot(y)
+plot!(mslecht)
+plot!(m)
+wavplay(y, samplerate)
+wavplay(mslecht, samplerate)
+wavplay(m, samplerate)
+
+
+
+sum( abs2.(Y))
+sum(abs2.(y))
+
+
+
 
 #plot(x[:,1])
 

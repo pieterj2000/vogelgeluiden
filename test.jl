@@ -271,12 +271,23 @@ Z = rstft(y, win2, hop, padding=padding)
 X-Y .|> abs2 |> sum
 X-Z .|> abs2 |> sum
 Y-Z .|> abs2 |> sum
-heatmap(Y .|> abs2)
-heatmap(Z .|> abs2)
-heatmap(Y-Z .|> abs2)
+heatmap(Y .|> abs)
+heatmap(Z .|> abs)
+heatmap(Y-Z .|> abs)
+
+M = abs.(X .|> abs)
+heatmap(M)
+
+m = irmstftm(M, win2, hop)
+plot(x)
+plot!(m)
+heatmap(M)
+heatmap(rstft(m, win2, hop) .|> abs)
+
+
 
 
 plot((hann_window(100)))
-plot!(normalize_window((hann_window(100)),75))
+plot!(normalize_window((hann_window(100)),39))
 
 sum(normalize_window(hann_window(50), 15))

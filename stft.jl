@@ -1,6 +1,8 @@
 module STFT
 
 using FFTW
+using Plots
+using WAV
 
 export stft, rstft, istft, irstft, imstft, irmstft, imstftm, irmstftm, normalize_window, hann_window
 
@@ -138,16 +140,45 @@ end
 
 
 
+function imstftmcommon(X :: Array{<:Real, 2}, w :: Vector{<:Number}, hop :: Int, stftfun, istftfun; padding=true) # :: Vector{<:Number}
+    #heatmap(X .|> log10) |> display
+    #Y = Complex.(X) #dit is gewoon met 0 als complexe component, heeft dus zelfde magnitude
+    Y = cispi.(rand(Float64, size(X))) .* X
 
+    #heatmap(Y .|> abs .|> log10) |> display
+    # TODO global minimum is niet gegarandeerd. Initial guess dus beter over nadenkn
+    # of misschien meerdere opties als parameter aanbieden
+
+    
+    println("start MSE $( (X - abs.(Y)) .|> abs2 |> sum)")
+
+    for i = 1:100
+        y = istftfun(Y, w, hop; padding)
+        Y = stftfun(y, w, hop; padding)
+        #heatmap(Y .|> abs .|> log10) |> display
+        #wavplay(y, 48000)
+        println("current MSE $( (X - abs.(Y)) .|> abs2 |> sum)")
+        angles = angle.(Y)
+        Y = angles .* X
+        #heatmap(Y .|> abs .|> log10) |> display
+    end
+    
+    y = istftfun(Y, w, hop; padding)
+    return y
+end
 
 """
 calculates least squares error (complex) signal estimate from modified (unitary) stft magnitudes.
 effectively calculates (unitary) inverse stft resulting in complex (time-domain) function, 
 but we only have magnitudes from the stft and these may have been modified and there may not 
 exist a signal that results in the modified 
+
+NB: magnitude is `abs`! not `abs2` or logarithmt
 """
-function imstftm()
-    error("unimplemented")
+function imstftm(X :: Array{<:Real, 2}, w :: Vector{<:Number}, hop :: Int; padding=true) :: Vector{<:Complex}
+    istftfun = istft
+    stftfun = stft
+    imstftmcommon(X, w, hop, stftfun, istftfun, padding=padding)
 end
 
 
@@ -156,9 +187,13 @@ calculates least squares error (real) signal estimate from modified (unitary) st
 effectively calculates (unitary) inverse stft resulting in real (time-domain) function, 
 but we only have magnitudes from the stft and these may have been modified and there may not 
 exist a signal that results in the modified 
+
+NB: magnitude is `abs`! not `abs2` or logarithmt
 """
-function irmstftm()
-    error("unimplemented")
+function irmstftm(X :: Array{<:Real, 2}, w :: Vector{<:Number}, hop :: Int; padding=true) :: Vector{<:Real}
+    istftfun = irstft
+    stftfun = rstft
+    imstftmcommon(X, w, hop, stftfun, istftfun, padding=padding)
 end
 
 
