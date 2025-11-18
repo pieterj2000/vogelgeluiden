@@ -24,14 +24,22 @@ _fft(x::AbstractMatrix{<:Real}, d) = rfft(x, d)
 _fft(x::AbstractMatrix{<:Complex}, d) = fft(x, d)
 
 
-function maaksegments(x :: Vector{T}, window_length :: Int, hop :: Int) where T<:Number #:: Array{<:Number, 2}
+function maaksegments(x :: Vector{T}, window_length :: Int, hop :: Int; padding=true) where T<:Number #:: Array{<:Number, 2}
+    
     signal_length = length(x)
     num_segments = div(signal_length - window_length, hop)+1
-    X = Array{T, 2}(undef, (window_length, num_segments))
+
+    numpadsegs = div(window_length - hop, hop, RoundUp)
+    num_segments = padding ? (num_segments + 2 *numpadsegs) : num_segments
+    padspul = zeros(T, hop * numpadsegs)
+
+    #X = Array{T, 2}(undef, (window_length, num_segments))
+    X = zeros(T, (window_length, num_segments))
+    xalt = padding ? [padspul ; x ; padspul] : x
     for j = 1:num_segments
         startindex = (j-1)*hop+1
         eindindex = startindex + window_length - 1
-        X[:, j] = x[startindex:eindindex]
+        X[:, j] = xalt[startindex:eindindex]
     end
     return X
 end
@@ -41,20 +49,20 @@ function applyWindow(X :: Array{<:Number, 2}, w :: Vector{<:Number}) #:: Array{N
 end
 
 "calculates unitary stft, for complex vectors calculates twosided, for real vectors calculates onesided (resulting in n/2 + 1 frequency bins)"
-function stft(x :: Vector{<:Number}, w :: Vector{<:Number}, hop :: Int) :: Array{<:Complex, 2}
+function stft(x :: Vector{<:Number}, w :: Vector{<:Number}, hop :: Int; padding=true) :: Array{<:Complex, 2}
     window_length = length(w)
-    segs = maaksegments(x, window_length, hop)
+    segs = maaksegments(x, window_length, hop; padding=padding)
     segsw = applyWindow( segs, w )
     return _fft(segsw, 1) ./ sqrt(length(w))
 end
 
 "calculates unitary stft for real vector, so onesided (resulting in n/2 + 1 frequency bins)"
-function rstft(x :: Vector{<:Real}, w :: Vector{<:Number}, hop :: Int) :: Array{<:Complex, 2}
-    stft(x, w, hop)
+function rstft(x :: Vector{<:Real}, w :: Vector{<:Number}, hop :: Int; padding=true) :: Array{<:Complex, 2}
+    stft(x, w, hop; padding=padding)
 end
 
 
-function overlapadd(X :: Array{T, 2}, win, hop :: Int; lse = false) :: Vector{T} where T <: Number
+function overlapadd(X :: Array{T, 2}, win, hop :: Int) :: Vector{T} where T <: Number
     X = X .* win
 
     num_segments = size(X)[2]
@@ -72,24 +80,36 @@ function overlapadd(X :: Array{T, 2}, win, hop :: Int; lse = false) :: Vector{T}
 end
 
 
-function istftcommon(X :: Array{<:Number, 2}, w :: Vector{<:Number}, hop :: Int) # :: Vector{<:Number}
+function istftcommon(X :: Array{<:Number, 2}, w :: Vector{<:Number}, hop :: Int, fftfun; padding=true) # :: Vector{<:Number}
+    win_len = length(w)
+
+    numpadsegs = div(win_len - hop, hop, RoundUp)
+    #if padding 
+    #    #numpadsegs = div(win_len - hop, hop, RoundUp)
+    #    #paddingsegs = zeros((size(X)[1], numpadsegs))
+    #    #Xalt = [paddingsegs X paddingsegs]
+    #    segs = fftfun(Xalt, win_len) .* sqrt(length(w))
+    #else
+        segs = fftfun(X, win_len) .* sqrt(length(w))
+    #end
+
     #segsw = applyWindow(X, window)
-    return overlapadd(X, w, hop)
+    x = overlapadd(segs, w, hop)
+    return padding ? x[numpadsegs*hop+1:end-numpadsegs*hop] : x
 end
 
 "calculates unitary inverse stft resulting in complex (time-domain) function.
  NB: requires a normalized window for perfect reconstruction"
-function istft(X :: Array{<:Number, 2}, w :: Vector{<:Number}, hop :: Int) :: Vector{<:Complex}
-    segs = ifft(X, 1) .* sqrt(length(w))
-    return istftcommon(segs, w, hop)
+function istft(X :: Array{<:Number, 2}, w :: Vector{<:Number}, hop :: Int; padding=true) :: Vector{<:Complex}
+    fftfun = (Y, wlen) -> ifft(Y, 1)
+    return istftcommon(X, w, hop, fftfun, padding=padding)
 end
 
 "calculates unitary inverse stft resulting in real (time-domain) function.
  NB: requires a normalized window for perfect reconstruction"
-function irstft(X :: Array{<:Number, 2}, w :: Vector{<:Number}, hop :: Int) :: Vector{<:Real}
-    window_length = length(w)
-    segs = irfft(X, window_length, 1) .* sqrt(length(w))
-    return istftcommon(segs, w, hop)
+function irstft(X :: Array{<:Number, 2}, w :: Vector{<:Number}, hop :: Int; padding=true) :: Vector{<:Real}
+    fftfun = (Y, wlen) -> irfft(Y, wlen, 1)
+    return istftcommon(X, w, hop, fftfun, padding=padding)
 end
 
 
@@ -145,7 +165,7 @@ end
 
 
 "normalize window such that the stft is perfectly representable,
-scales window such that \sum_k w^2(k*S-n) = 1
+scales window such that \\sum_k w^2(k*S-n) = 1
 "
 function normalize_window(w, hop)
     win_len = length(w)

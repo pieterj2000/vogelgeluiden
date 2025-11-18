@@ -3,6 +3,7 @@ using Plots
 using FFTW
 
 include("stft.jl")
+using .STFT
 
 win_len = 50
 win = STFT.hann_window(win_len)
@@ -161,7 +162,7 @@ plot([x, x2ons])
 MTM(ones(signal_len))
 MTMons(ones(signal_len))
 
-
+win_hatons = STFT.normalize_window(win, hop)
 plot(win)
 plot!(win_hatons)
 z = randn(signal_len)+ randn(signal_len)im
@@ -171,8 +172,17 @@ in2 = inner_product( z, STFT.istft(Z , win, hop) )
 println("*** Testing transpose for M3 ***")
 println("Difference between the two inner products: ", in1 - in2)
 
-     
+
+
+win2 = normalize_window(win, hop)
+padding=true
+MTMons = z -> STFT.istft(STFT.stft(Complex.(z), win2, hop; padding=padding
+            ) , win2, hop; padding=padding
+            )
+
 P = MTM(ones(signal_len)) .|> real
+stft(ones(Complex, signal_len), win, hop) .|> abs2 .|> log10 |> heatmap
+stft(Complex.(x), win, hop) .|> abs2 .|> log10 |> heatmap
 plot(P[10:end-10])
 P2 = MTMons(ones(signal_len)) .|> real
 plot!(P2[10:end-10])
@@ -235,11 +245,38 @@ plot!(x2 .|> real)
 abs2.(x - x2) |> sum
 
 
+win = hann_window(win_len)
+winnorm = normalize_window(win, hop)
+plot(win)
+plot!(winnorm)
 
+win2 = winnorm
+padding = true
 
+x = randn(signal_len)
+plot(x)
+X = rstft(x, win2, hop, padding=padding)
+plot!(irstft(X, win2, hop, padding=padding))
+x - irstft(X, win2, hop, padding=padding) .|> abs2 |> sum
+heatmap(X .|> abs2 .|> log10)
+Y = zeros(Complex, size(X))
+Y = Y .+ 1e-10
+Y[1:5, :] = X[1:5, :]
+heatmap(Y .|> abs2 .|> log10)
+y = irstft(Y, win2, hop, padding=padding)
+x - y .|> abs2 |> sum
+plot(x)
+plot!(y)
+Z = rstft(y, win2, hop, padding=padding)
+X-Y .|> abs2 |> sum
+X-Z .|> abs2 |> sum
+Y-Z .|> abs2 |> sum
+heatmap(Y .|> abs2)
+heatmap(Z .|> abs2)
+heatmap(Y-Z .|> abs2)
 
 
 plot((hann_window(100)))
-plot!(normalize_window((hann_window(100)),50))
+plot!(normalize_window((hann_window(100)),75))
 
 sum(normalize_window(hann_window(50), 15))
