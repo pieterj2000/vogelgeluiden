@@ -43,44 +43,50 @@ function conv(f, g)
     end
     return result
 end
-function conv(f, g)
-    glen = length(g)
-    glen2 = div(glen,2)
-    pad = zeros(glen2)
-    fp = [pad ; f ; pad]
-    result = zeros(length(f))
-    for i=1:length(f)
-        result[i] = fp[i:(i+glen-1)]' * g
-    end
-    return result
-end
+
+
+# probleembestanden
+#"XC121684.mp3" # veel noise
+#"XC362777.mp3" # zacht
+#"XC702690.mp3" # zacht
+#"XC694031.mp3" # zacht, maar super wacky
 
 
 file = rand(goedeaudiofiles)#[1]
+file
 x = readwav("data/downloads/$file")
-plot(x)
-y = x[:, 2]
-mask = abs.(y) .> 0.03
+length(x) / 48000
+#plot(x)
+ys = collect(Iterators.partition(x[:,1], 960000))
+
+y = collect(ys[1])
+
+mask = abs.(y) .> 0.06  #0.03
 plot(y)
 plot!(mask)
 
-
-plot(y[1:48000])
-plot!(mask[1:48000])
-
-wavplay(y[1:48000], samplerate)
-
-
-plot(mask[11800:11900])
-mask[11830:29000]
-maskstarts[11830:29000]
-
-wavplay(y, samplerate)
-maskstarts = conv(mask, [-1,1]) .|> Int
+yalt = conv(abs.(y), ones(751)./ 50)
+thresh = 0.10 + quantile(yalt, 0.33)*4
+maskalt = yalt .> thresh #0.2  #0.03
+quantile(yalt, 0.33)
+median(yalt)
 
 
+#y[170000:end-30000]
+#plot(y[179880:end-60050])
+#plot!(mask[179880:end-60050])
+#plot!(yalt[179880:end-60050])
+#plot(y)#[130000:135000])
+#plot!(mask)
+#plot!(maskalt .* rand(length(y)) .* 0.4 .+ 0.2)
+#plot!(yalt)
 
-mingat = 50
+
+mask = maskalt
+
+maskalt
+maskstarts = conv(mask, [-1,1,0]) .|> Int
+mingat = 250 # 50 is wel goeie, TODO: misschien hier een tweede laag over doen met langere tijd
 indices = findall(i -> i != 0, maskstarts)
 vorigestart = indices[1]
 vorigeeind = indices[1]
@@ -88,6 +94,7 @@ segs = []
 #its = Iterators.takewhile(<(48000), Iterators.drop(indices, 1))
 its = Iterators.drop(indices, 1)
 for i in its
+    #println("$i: $(maskstarts[i])")
     if maskstarts[i] == 1
         # start
         if (i - vorigeeind) > 48*mingat  ## groot gat
@@ -99,14 +106,31 @@ for i in its
         vorigeeind = i
     end
 end
+if maskalt[end] == 1
+    vorigeeind = length(maskalt)
+end
 push!(segs, (vorigestart-mingat*24, vorigeeind+mingat*24))
 segs
 
-plot(mask)
-plot!(y)
+println("klaar om te printen")
+
+plot([0]; legend=false)
+plot(mask .* rand(length(y)) .* 0.4 .+ 0.2)
+println("mask geprint")
 #plot!(mask[1:48000])
 map( t-> plot!(t[1]:t[2], x -> rand() .* 0.4), segs)
-plot!([0]; legend=false)
+println("segs klaar")
+plot!(min.(yalt, 0.5), color=:black,legend=false)
+println("segs geprint")
+plot!(y, color=:blue,legend=false)
+
+
+wavplay(y, samplerate)
+
+
+seg = 4
+wavplay(y[segs[seg][1]:segs[seg][2]], samplerate)
+y = y[segs[seg][1]:segs[seg][2]]
 
 
 convmask = conv(max.(y, mask), ones(48*10)) ./ (48*10)

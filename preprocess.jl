@@ -85,8 +85,9 @@ heatmap((meanfour .|> abs2 .|> log10) .- m)
 #x = readwav("piano2.wav")
 file = rand(goedeaudiofiles)
 #file = goedeaudiofiles[6]
-x = readwav("data/downloads/$file")
+x = readwav("data/downloads/XC168865.mp3")
 
+x = readwav("data/downloads/$file")
 
 y = x[1:(10*samplerate),1]
 #y = x #x[1:(3*samplerate),1]
@@ -122,7 +123,7 @@ plot!(powers'*scale2) |> display
 powersconv = conv(powers'*scale2, ones(9)./9)
 plot!(powersconv)
 #plot!((1:480000) ./ 480000 .* 1603, y .*400 .- 200)
-yloud = (abs.(y) .> 0.03) .* y
+yloud = (abs.(y) .> 0.05) .* y
 plot!((1:480000) ./ 480000 .* 1603, y .*400 .- 200)
 plot!((1:480000) ./ 480000 .* 1603, yloud .*400 .- 200)
 wavplay(y, samplerate)
