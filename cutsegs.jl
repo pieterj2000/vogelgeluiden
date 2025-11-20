@@ -2,12 +2,8 @@ using JSON
 using StatsBase
 using FFMPEG_jll
 using WAV
-
 using Plots
 
-
-include("stft.jl")
-using .STFT
 
 
 files = readdir("data/downloads/")
@@ -26,8 +22,6 @@ samplerate = 48000 :: Int
 
 goedeaudiofiles = filter( x -> JSON.parsefile("data/downloads/" * split(x, ".")[1])["smp"] == string(samplerate), audiofiles)
 
-
-"sdfsdlfjsdlfkj"
 function readwav(file :: String) 
     filepath, fileio = mktemp()
     run(`$(ffmpeg()) -i $file -f wav $(filepath) -y`)
@@ -37,6 +31,87 @@ function readwav(file :: String)
     rm(filepath; force=true)
     return wav
 end
+
+function conv(f, g)
+    glen = length(g)
+    glen2 = div(glen,2)
+    pad = zeros(glen2)
+    fp = [pad ; f ; pad]
+    result = zeros(length(f))
+    for i=1:length(f)
+        result[i] = fp[i:(i+glen-1)]' * g
+    end
+    return result
+end
+function conv(f, g)
+    glen = length(g)
+    glen2 = div(glen,2)
+    pad = zeros(glen2)
+    fp = [pad ; f ; pad]
+    result = zeros(length(f))
+    for i=1:length(f)
+        result[i] = fp[i:(i+glen-1)]' * g
+    end
+    return result
+end
+
+
+file = rand(goedeaudiofiles)#[1]
+x = readwav("data/downloads/$file")
+plot(x)
+y = x[:, 2]
+mask = abs.(y) .> 0.03
+plot(y)
+plot!(mask)
+
+
+plot(y[1:48000])
+plot!(mask[1:48000])
+
+wavplay(y[1:48000], samplerate)
+
+
+plot(mask[11800:11900])
+mask[11830:29000]
+maskstarts[11830:29000]
+
+wavplay(y, samplerate)
+maskstarts = conv(mask, [-1,1]) .|> Int
+
+
+
+mingat = 50
+indices = findall(i -> i != 0, maskstarts)
+vorigestart = indices[1]
+vorigeeind = indices[1]
+segs = []
+#its = Iterators.takewhile(<(48000), Iterators.drop(indices, 1))
+its = Iterators.drop(indices, 1)
+for i in its
+    if maskstarts[i] == 1
+        # start
+        if (i - vorigeeind) > 48*mingat  ## groot gat
+            push!(segs, (vorigestart-mingat*24, vorigeeind+mingat*24))
+            vorigestart = i
+        end # anders hoeven we niets te doen...
+    else 
+        # eind
+        vorigeeind = i
+    end
+end
+push!(segs, (vorigestart-mingat*24, vorigeeind+mingat*24))
+segs
+
+plot(mask)
+plot!(y)
+#plot!(mask[1:48000])
+map( t-> plot!(t[1]:t[2], x -> rand() .* 0.4), segs)
+plot!([0]; legend=false)
+
+
+convmask = conv(max.(y, mask), ones(48*10)) ./ (48*10)
+plot!(convmask)
+
 
 
 numfiles = length(goedeaudiofiles)
