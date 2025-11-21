@@ -139,7 +139,8 @@ function irmstft()
 end
 
 
-
+# TODO: er bestaan andere (betere?) methodes voor dit
+# zie ook https://nl.mathworks.com/help/signal/ref/stftmag2sig.html waar verschillende opties zijn
 function imstftmcommon(X :: Array{<:Real, 2}, w :: Vector{<:Number}, hop :: Int, stftfun, istftfun; padding=true) # :: Vector{<:Number}
     #heatmap(X .|> log10) |> display
     #Y = Complex.(X) #dit is gewoon met 0 als complexe component, heeft dus zelfde magnitude
